@@ -1,0 +1,11 @@
+TCG 2022 Project 1 Judge V2022-09-20
+The provided judge program, threes-judge, can only be executed in the Linux environment.
+
+Before running the judge, make sure that it remains executable:
+$ chmod +x threes-judge
+
+To judge a statistics file "stats.txt":
+$ ./threes-judge --load=stats.txt
+
+To judge a statistics file "stats.txt" with a given speed limit:
+$ ./threes-judge --load=stats.txt --judge="speed=100000"
