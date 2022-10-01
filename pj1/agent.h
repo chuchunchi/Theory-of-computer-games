@@ -198,3 +198,30 @@ public:
 private:
         std::array<int, 4> opcode;
 };
+
+class reward2_slider : public random_agent {
+public:
+	reward2_slider(const std::string& args = "") : random_agent("name=slide role=slider " + args), opcode({0,1,2,3}) {}
+	virtual action take_action(const board& before) {
+		board::reward best_reward = -1;
+		int best_op = 0;
+		for (int op : opcode) {
+			board board1 = board(before);
+			board::reward reward1 = board1.slide(op);
+			if(reward1 != -1){
+				for (int op2 : opcode) {
+					board board2 = board(board1);
+					board::reward reward2 = board2.slide(op2);
+					if(reward1+reward2 > best_reward){
+						best_reward = reward1+reward2;
+						best_op = op;
+					}
+				}
+			}
+		}
+		return action::slide(best_op);
+		return action();
+	}	
+private:
+	std::array<int, 4> opcode;
+};	
