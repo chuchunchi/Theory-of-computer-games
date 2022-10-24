@@ -18,6 +18,7 @@
 #include "board.h"
 #include "action.h"
 #include "weight.h"
+#include <string>
 
 class agent {
 public:
@@ -72,17 +73,18 @@ protected:
  */
 class weight_agent : public agent {
 public:
-	weight_agent(const std::string& args = "") : agent(args), alpha(0) {
+	weight_agent(const std::string& args = "") : agent(args), alpha(0), trained(0) {
 		if (meta.find("init") != meta.end())
 			init_weights(meta["init"]);
 		if (meta.find("load") != meta.end())
 			load_weights(meta["load"]);
 		if (meta.find("alpha") != meta.end())
-			alpha = float(meta["alpha"]);
+			alpha = float(meta["alpha"]); 
 	}
 	virtual ~weight_agent() {
 		if (meta.find("save") != meta.end())
 			save_weights(meta["save"]);
+			trained = 1;
 	}
 
 protected:
@@ -114,6 +116,7 @@ protected:
 protected:
 	std::vector<weight> net;
 	float alpha;
+	int trained;
 };
 
 /**
@@ -224,4 +227,104 @@ public:
 	}	
 private:
 	std::array<int, 4> opcode;
+};	
+int n=8;
+int tuple[n][4] = { {0, 1, 2, 3},
+                    {4, 5, 6, 7},
+                    {8, 9, 10, 11},
+                    {12, 13, 14, 15},
+                    {0, 4, 8, 12},
+                    {1, 5, 9, 13},
+                    {2, 6, 10, 14},
+                    {3, 7, 11, 15}};
+
+class weight_slider : public weight_agent {
+public:
+	weight_slider(const std::string& args = "") : weight_agent("name=slide role=slider " + args) {}
+	virtual action take_action(const board& before) {
+		board::reward reward1;
+		double bestval=-1;
+		int bestop=0;
+		for(int op=0;op<4;op++){
+			board board1 = before;
+			board::reward reward1 =board1.slide(op);
+			if(reward1 != -1){
+				double value = get_value(board1);
+				if(reward1+value>bestval){
+					bestval = reward1+value;
+					bestop=op;
+				}
+			}
+		}
+		next = before;
+		prev = before;
+		board::reward nextreward = next.slide(bestop);
+		if(trained==0){
+			TDlearn(nextreward);
+		}
+		return action::slide(bestop);
+		return action();
+	}	
+	double get_value(board& b){
+		int value=0;
+		for(int i=0;i<n;i++){
+			value+=net[i][b2feature(b,i)];
+		}
+	}
+	void TDlearn(int reward){
+		int TDerr = alpha*(reward+get_value(next)-get_value(prev));
+		for(int i=0;i<n;i++){
+			net[i][b2feature(prev,i)] += TDerr;
+		}
+	}
+	int b2feature(board b,int f){//board to feaature
+		string ret="";
+		for(int ro=0;ro<2;ro++){
+			for(int i=0;i<4;i++){
+				board::row tmprow = b[i];
+				for(int j=0;j<4;j++){
+					board::cell tmpcell = tmprow[j];
+					switch(tmpcell){
+						case 1: case 2: case 3:
+							ret+=to_string(tmpcell);
+							break;
+						case 6:
+							ret+=to_string(4);
+							break;
+						case 12:
+							ret+=to_string(5);
+							break;
+						case 24:
+							ret+=to_string(6);
+							break;
+						case 48:
+							ret+=to_string(7);
+							break;
+						case 96:
+							ret+=to_string(8);
+							break;
+						case 192:
+							ret+=to_string(9);
+							break;
+						case 384:
+							ret+='a';
+							break;
+						case 768:
+							ret+='b';
+							break;
+						case 1536:
+							ret+='c';
+							break;
+						case 3072:
+							ret+='d';
+							break;
+					}
+				}
+			}
+			b.transpose();
+		}
+	}
+private:
+	board next;
+	board prev;
 };	
