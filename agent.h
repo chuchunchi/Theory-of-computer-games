@@ -18,8 +18,8 @@
 #include "board.h"
 #include "action.h"
 #include "weight.h"
-#include <string>
-
+#include <vector>
+using namespace std;
 class agent {
 public:
 	agent(const std::string& args = "") {
@@ -82,9 +82,10 @@ public:
 			alpha = float(meta["alpha"]); 
 	}
 	virtual ~weight_agent() {
-		if (meta.find("save") != meta.end())
+		if (meta.find("save") != meta.end()){
 			save_weights(meta["save"]);
 			trained = 1;
+		}
 	}
 
 protected:
@@ -229,7 +230,7 @@ private:
 	std::array<int, 4> opcode;
 };	
 int n=8;
-int tuple[n][4] = { {0, 1, 2, 3},
+int tuple[8][4] = { {0, 1, 2, 3},
                     {4, 5, 6, 7},
                     {8, 9, 10, 11},
                     {12, 13, 14, 15},
@@ -266,59 +267,63 @@ public:
 		return action();
 	}	
 	double get_value(board& b){
-		int value=0;
+		double value=0;
+		vector<string> feat = b2feature(b);
 		for(int i=0;i<n;i++){
-			value+=net[i][b2feature(b,i)];
+			value+=net[i][stoi(feat[i])];
+		}
+		return value;
+	}
+	void TDlearn(double reward){
+		double TDerr = alpha*(reward+get_value(next)-get_value(prev));
+		vector<string> feat = b2feature(b);
+		for(int i=0;i<n;i++){
+			net[i][stoi(feat[i])] += TDerr;
 		}
 	}
-	void TDlearn(int reward){
-		int TDerr = alpha*(reward+get_value(next)-get_value(prev));
-		for(int i=0;i<n;i++){
-			net[i][b2feature(prev,i)] += TDerr;
-		}
-	}
-	int b2feature(board b,int f){//board to feaature
-		string ret="";
-		for(int ro=0;ro<2;ro++){
+	vector<string> b2feature(board b){//board to feaature
+		vector<string> ret(n); 
+		for(int ro=0;ro<5;ro+=4){
 			for(int i=0;i<4;i++){
 				board::row tmprow = b[i];
 				for(int j=0;j<4;j++){
 					board::cell tmpcell = tmprow[j];
 					switch(tmpcell){
 						case 1: case 2: case 3:
-							ret+=to_string(tmpcell);
+							ret[i+ro]+=to_string(tmpcell);
 							break;
 						case 6:
-							ret+=to_string(4);
+							ret[i+ro]+=to_string(4);
 							break;
 						case 12:
-							ret+=to_string(5);
+							ret[i+ro]+=to_string(5);
 							break;
 						case 24:
-							ret+=to_string(6);
+							ret[i+ro]+=to_string(6);
 							break;
 						case 48:
-							ret+=to_string(7);
+							ret[i+ro]+=to_string(7);
 							break;
 						case 96:
-							ret+=to_string(8);
+							ret[i+ro]+=to_string(8);
 							break;
 						case 192:
-							ret+=to_string(9);
+							ret[i+ro]+=to_string(9);
 							break;
 						case 384:
-							ret+='a';
+							ret[i+ro]+=to_string(10);
 							break;
 						case 768:
-							ret+='b';
+							ret[i+ro]+=to_string(11);
 							break;
 						case 1536:
-							ret+='c';
+							ret[i+ro]+=to_string(12);
 							break;
 						case 3072:
-							ret+='d';
+							ret[i+ro]+=to_string(13);
 							break;
 					}
+					ret[i+ro]+=to_string(0);
 				}
 			}
 			b.transpose();
