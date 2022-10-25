@@ -257,6 +257,7 @@ public:
 				}
 			}
 		}
+		cout << "here\n";
 		next = before;
 		prev = before;
 		board::reward nextreward = next.slide(bestop);
@@ -276,7 +277,7 @@ public:
 	}
 	void TDlearn(double reward){
 		double TDerr = alpha*(reward+get_value(next)-get_value(prev));
-		vector<string> feat = b2feature(b);
+		vector<string> feat = b2feature(prev);
 		for(int i=0;i<n;i++){
 			net[i][stoi(feat[i])] += TDerr;
 		}
@@ -328,6 +329,7 @@ public:
 			}
 			b.transpose();
 		}
+		return ret;
 	}
 private:
 	board next;

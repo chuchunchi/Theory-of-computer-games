@@ -1,0 +1,2 @@
+ghts_size="65536,65536,65536,65536,65536,65536,65536,65536" 
+./threes --total=100000 --block=1000 --limit=1000 --slide="init=$weights_size save=weights.bin"
