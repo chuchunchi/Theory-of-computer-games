@@ -84,6 +84,7 @@ public:
 	virtual ~weight_agent() {
 		if (meta.find("save") != meta.end()){
 			save_weights(meta["save"]);
+			trained = 1;
 		}
 	}
 
@@ -242,6 +243,7 @@ class weight_slider : public weight_agent {
 public:
 	weight_slider(const std::string& args = "") : weight_agent("name=slide role=slider " + args) {}
 	virtual action take_action(const board& before) {
+		board::reward reward1;
 		double bestval=-1;
 		int bestop=0;
 		for(int op=0;op<4;op++){
@@ -274,10 +276,7 @@ public:
 		cout << "\ndone b2feature\n";
 		
 		for(int i=0;i<n;i++){
-			cout << stoi(feat[i]) << endl;
-			long long num = stoi(feat[i]);
-			value+=net[i][num];
-			cout << "ok????????\n";
+			value += net[i][stoi(feat[i])];
 		}
 		cout << "\ndone for loop\n";
 		return value;
@@ -293,49 +292,53 @@ public:
 		vector<string> ret(n); 
 		for(int ro=0;ro<5;ro+=4){
 			for(int i=0;i<4;i++){
-				ret[i+ro]+=to_string(1);
 				board::row tmprow = b[i];
 				for(int j=0;j<4;j++){
 					board::cell tmpcell = tmprow[j];
 					switch(tmpcell){
-						case 1: case 2: case 3:
-							ret[i+ro]+=to_string(tmpcell);
+						case 1:
+							ret[i+ro]+="11";
+							break;
+						case 2:
+							ret[i+ro]+="12";
+							break;
+						case 3:
+							ret[i+ro]+="13";
 							break;
 						case 6:
-							ret[i+ro]+=to_string(4);
+							ret[i+ro]+="14";
 							break;
 						case 12:
-							ret[i+ro]+=to_string(5);
+							ret[i+ro]+="15";
 							break;
 						case 24:
-							ret[i+ro]+=to_string(6);
+							ret[i+ro]+="16";
 							break;
 						case 48:
-							ret[i+ro]+=to_string(7);
+							ret[i+ro]+="17";
 							break;
 						case 96:
-							ret[i+ro]+=to_string(8);
+							ret[i+ro]+="18";
 							break;
 						case 192:
-							ret[i+ro]+=to_string(9);
+							ret[i+ro]+="19";
 							break;
 						case 384:
-							ret[i+ro]+=to_string(10);
+							ret[i+ro]+="20";
 							break;
 						case 768:
-							ret[i+ro]+=to_string(11);
+							ret[i+ro]+="21";
 							break;
 						case 1536:
-							ret[i+ro]+=to_string(12);
+							ret[i+ro]+="22";
 							break;
 						case 3072:
-							ret[i+ro]+=to_string(13);
+							ret[i+ro]+="23";
 							break;
 						default:
-							ret[i+ro]+=to_string(0);
+							ret[i+ro]+="24";
 							break;
 					}
-					ret[i+ro]+=to_string(0);
 				}
 			}
 			b.transpose();
