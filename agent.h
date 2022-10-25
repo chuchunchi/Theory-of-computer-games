@@ -84,7 +84,6 @@ public:
 	virtual ~weight_agent() {
 		if (meta.find("save") != meta.end()){
 			save_weights(meta["save"]);
-			trained = 1;
 		}
 	}
 
@@ -243,15 +242,16 @@ class weight_slider : public weight_agent {
 public:
 	weight_slider(const std::string& args = "") : weight_agent("name=slide role=slider " + args) {}
 	virtual action take_action(const board& before) {
-		board::reward reward1;
 		double bestval=-1;
 		int bestop=0;
 		for(int op=0;op<4;op++){
 			board board1 = before;
 			board::reward reward1 =board1.slide(op);
 			if(reward1 != -1){
+				cout << "\nyes reward\n";
 				double value = get_value(board1);
 				if(reward1+value>bestval){
+					cout << "\nyes if\n";
 					bestval = reward1+value;
 					bestop=op;
 				}
@@ -269,10 +269,17 @@ public:
 	}	
 	double get_value(board& b){
 		double value=0;
+		cout << "\nin get value";
 		vector<string> feat = b2feature(b);
+		cout << "\ndone b2feature\n";
+		
 		for(int i=0;i<n;i++){
-			value+=net[i][stoi(feat[i])];
+			cout << stoi(feat[i]) << endl;
+			long long num = stoi(feat[i]);
+			value+=net[i][num];
+			cout << "ok????????\n";
 		}
+		cout << "\ndone for loop\n";
 		return value;
 	}
 	void TDlearn(double reward){
@@ -286,6 +293,7 @@ public:
 		vector<string> ret(n); 
 		for(int ro=0;ro<5;ro+=4){
 			for(int i=0;i<4;i++){
+				ret[i+ro]+=to_string(1);
 				board::row tmprow = b[i];
 				for(int j=0;j<4;j++){
 					board::cell tmpcell = tmprow[j];
@@ -322,6 +330,9 @@ public:
 							break;
 						case 3072:
 							ret[i+ro]+=to_string(13);
+							break;
+						default:
+							ret[i+ro]+=to_string(0);
 							break;
 					}
 					ret[i+ro]+=to_string(0);
