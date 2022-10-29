@@ -73,7 +73,7 @@ protected:
  */
 class weight_agent : public agent {
 public:
-	weight_agent(const std::string& args = "") : agent(args), alpha(0), trained(0) {
+	weight_agent(const std::string& args = "") : agent(args), alpha(0.1/32), trained(0) {
 		if (meta.find("init") != meta.end())
 			init_weights(meta["init"]);
 		if (meta.find("load") != meta.end())
@@ -84,7 +84,6 @@ public:
 	virtual ~weight_agent() {
 		if (meta.find("save") != meta.end()){
 			save_weights(meta["save"]);
-			trained = 1;
 		}
 	}
 
@@ -229,122 +228,101 @@ public:
 private:
 	std::array<int, 4> opcode;
 };	
-int n=8;
-int tuple[8][4] = { {0, 1, 2, 3},
-                    {4, 5, 6, 7},
-                    {8, 9, 10, 11},
-                    {12, 13, 14, 15},
-                    {0, 4, 8, 12},
-                    {1, 5, 9, 13},
-                    {2, 6, 10, 14},
-                    {3, 7, 11, 15}};
+int n=4;
+int tup[4][6] = { {0, 1, 2, 3, 4, 5},
+                    {4, 5, 6, 7, 8, 9},
+                    {5, 6, 7, 9, 10, 11},
+                    {9, 10, 11, 13, 14, 15}};
 
 class weight_slider : public weight_agent {
 public:
 	weight_slider(const std::string& args = "") : weight_agent("name=slide role=slider " + args) {}
+	virtual void open_episode(const std::string& flag = "") {
+        trained = 0;
+    }
 	virtual action take_action(const board& before) {
-		board::reward reward1;
-		double bestval=-1;
-		int bestop=0;
+		double bestval=-10000000;
+		int bestop=-1;
+		if(!trained) prev=before; // if the first step
 		for(int op=0;op<4;op++){
 			board board1 = before;
 			board::reward reward1 =board1.slide(op);
+			// choose the best operation base on current weight table.
 			if(reward1 != -1){
-				cout << "\nyes reward\n";
 				double value = get_value(board1);
 				if(reward1+value>bestval){
-					cout << "\nyes if\n";
 					bestval = reward1+value;
 					bestop=op;
 				}
 			}
 		}
-		cout << "here\n";
 		next = before;
-		prev = before;
 		board::reward nextreward = next.slide(bestop);
-		if(trained==0){
-			TDlearn(nextreward);
+		if(trained) TDlearn(nextreward); // if not the first step
+		trained = 1;
+		if(bestop!=-1){
+			prev = next;
+			return action::slide(bestop);
 		}
-		return action::slide(bestop);
-		return action();
+		else{ // bestop==-1 -> no available move
+			return action();
+		}
+		
 	}	
+
 	double get_value(board& b){
 		double value=0;
-		cout << "\nin get value";
-		vector<string> feat = b2feature(b);
-		cout << "\ndone b2feature\n";
-		
+		//for 8*4 tuple
+		/*
 		for(int i=0;i<n;i++){
-			value += net[i][stoi(feat[i])];
+			value += net[i][b2feature(b,i];
+		}*/
+
+		//for 4*6 tuple
+		for(int i=0;i<2;i++){
+			for(int j=0;j<4;j++){
+				for(int f=0;f<n;f++){
+					value += net[f][b2feature(b,f)];
+				}
+				b.rotate_clockwise();
+			}
+			b.reflect_vertical();
 		}
-		cout << "\ndone for loop\n";
 		return value;
 	}
+
 	void TDlearn(double reward){
-		double TDerr = alpha*(reward+get_value(next)-get_value(prev));
-		vector<string> feat = b2feature(prev);
+		double TDerr;
+		if(reward==-1) TDerr = alpha*(-get_value(prev));
+		else TDerr = alpha*(reward+get_value(next)-get_value(prev));
+		
+		/* for 8*4-tuple
 		for(int i=0;i<n;i++){
-			net[i][stoi(feat[i])] += TDerr;
+			net[i][b2feature(prev,i)] += TDerr;
+		}*/
+		// for 4*6-tuple
+		for(int i=0;i<2;i++){
+			for(int j=0;j<4;j++){
+				for(int f=0;f<n;f++){
+					net[f][b2feature(prev,f)] += TDerr;
+				}
+				prev.rotate_clockwise();
+			}
+			prev.reflect_vertical();
 		}
 	}
-	vector<string> b2feature(board b){//board to feaature
-		vector<string> ret(n); 
-		for(int ro=0;ro<5;ro+=4){
-			for(int i=0;i<4;i++){
-				board::row tmprow = b[i];
-				for(int j=0;j<4;j++){
-					board::cell tmpcell = tmprow[j];
-					switch(tmpcell){
-						case 1:
-							ret[i+ro]+="11";
-							break;
-						case 2:
-							ret[i+ro]+="12";
-							break;
-						case 3:
-							ret[i+ro]+="13";
-							break;
-						case 6:
-							ret[i+ro]+="14";
-							break;
-						case 12:
-							ret[i+ro]+="15";
-							break;
-						case 24:
-							ret[i+ro]+="16";
-							break;
-						case 48:
-							ret[i+ro]+="17";
-							break;
-						case 96:
-							ret[i+ro]+="18";
-							break;
-						case 192:
-							ret[i+ro]+="19";
-							break;
-						case 384:
-							ret[i+ro]+="20";
-							break;
-						case 768:
-							ret[i+ro]+="21";
-							break;
-						case 1536:
-							ret[i+ro]+="22";
-							break;
-						case 3072:
-							ret[i+ro]+="23";
-							break;
-						default:
-							ret[i+ro]+="24";
-							break;
-					}
-				}
-			}
-			b.transpose();
+
+	long long int  b2feature(board& b,int f){//board to feature
+		long long int ret=0;
+		int weight[6] = {1,15,225,3375,50625,759375};
+		for(int c=0;c<6;c++){
+			int cell_index = tup[f][c];
+			board::cell tmpcell=b(cell_index);
+			ret+=weight[c]*tmpcell;
 		}
 		return ret;
 	}
+
 private:
 	board next;
 	board prev;
