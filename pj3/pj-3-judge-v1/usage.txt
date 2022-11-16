@@ -1,0 +1,58 @@
+TCG 2022 Project 3 Judger & Utilities V20221101
+The provided judger, nogo-judge, can only be executed in the Linux environment.
+The provided scripts, run-gogui-*.sh, require bash, common commands, and some GoGui tools.
+The tools extracted from GoGui (in gogui-1.4.9 folder) require Java runtime.
+(If you need the complete GoGui package, please check the official GoGui website)
+
+Before running the judger, make sure that the files remain executable:
+$ chmod +x nogo-judge run-gogui-twogtp.sh run-gogui-server.sh
+
+===========================================================================
+
+Bash script "run-gogui-twogtp.sh" is for evaluating the win rates between two programs.
+
+First, edit this file with a text editor.
+At the beginning of this script, the commands of both sides are defined.
+Replace P1B and P1W with your commands accordingly, remember to keep the ' quote marks.
+> P1B='./nogo --shell --name="Hollow-Black" --black="mcts T=1000"'
+> P1W='./nogo --shell --name="Hollow-White" --white="mcts T=1000"'
+
+Note that P2B and P2W are already commands of the judger and can be used directly.
+> P2B='./nogo-judge --shell --name="Judge-Weak-Black" --black="weak"'
+> P2W='./nogo-judge --shell --name="Judge-Weak-White" --white="weak"'
+The judger provides 4 levels: "random", "weak", "medium", and "strong".
+
+Once the modification is done, save the file, and run the script as follows:
+$ ./run-gogui-twogtp.sh 20 # play 20 games in total
+
+Then, the monitor for displaying running games will be printed by the script.
+You can use another terminal to launch the monitor (./gogui-twogtp-XXX.mon).
+
+The results will be displayed once all games are finished.
+Ths statistics and episodes of all games are saved in gogui-twogtp-* folder.
+
+===========================================================================
+
+To play with a remote program via internet, follow the instructions below.
+
+At remote side:
+First, edit the script "run-gogui-server.sh",
+at line 3, replace the command with the command of the program to be launched.
+> player='./nogo --shell --name="Hollow" --black="mcts T=1000" --white="mcts T=1000"'
+
+Then, start the script as follows:
+$ ./run-gogui-server.sh # you may specify a port for incoming connection
+
+If two program instances are required, run two scripts with different commands.
+Once the script successfully started, the hostname and the address will be displayed.
+Note that if a port is already taken, the script will try the next port number.
+Therefore, when multiple ports are displayed (Port: XXXXX), use the last one.
+
+At local side:
+Edit the script "run-gogui-twogtp.sh",
+Uncomment line 10 and 11 and replace them with correct addresses and ports.
+> #P2B="gogui-client tcglinux1 12345"
+> #P2W="gogui-client tcglinux1 12345"
+
+Replace the hostname and port number to those displayed at the remote side.
+Finally, save the changes and launch the script.
