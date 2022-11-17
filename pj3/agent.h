@@ -100,34 +100,6 @@ private:
 	board::piece_type who;
 };
 
-class mctsplayer : public agent {
-	public:
-		mctsplayer(const std::string& args = "") : agent("name=mcts role=unknown " + args),
-			space(board::size_x * board::size_y), who(board::empty) {
-			if (name().find_first_of("[]():; ") != std::string::npos)
-				throw std::invalid_argument("invalid name: " + name());
-			if (role() == "black") who = board::black;
-			if (role() == "white") who = board::white;
-			if (who == board::empty)
-				throw std::invalid_argument("invalid role: " + role());
-			for (size_t i = 0; i < space.size(); i++)
-				space[i] = action::place(i, who);
-		}
-
-		virtual action take_action(board& state) {
-			MCTS mcts{who, state};
-			mcts.mcts_simulate(int(meta["simulation"]));
-			action::place move = mcts.bestaction();
-			return move;
-		}
-
-	private:
-		std::vector<action::place> space;
-		board::piece_type who;
-		std::default_random_engine engine;
-	
-};
-
 class MCTS{
 	private:
 		struct Node{
@@ -135,7 +107,7 @@ class MCTS{
 		int wintime;
 		vector<Node*> childs;
 		board position;
-		Node(board& b): visittime(0), wintime(0), position(b){}
+		Node(const board& b): visittime(0), wintime(0), position(b){}
 		
 		
 	};
@@ -145,25 +117,27 @@ class MCTS{
 		vector<action::place> oppospace;
 		board::piece_type who;
 		std::default_random_engine engine;
-		MCTS(board::piece_type who, board& b): myspace(board::size_x * board::size_y), oppospace(board::size_x * board::size_y){
+		MCTS(board::piece_type who, const board& b): myspace(board::size_x * board::size_y), oppospace(board::size_x * board::size_y){
 			who = who;
 			root = new Node(b);
 			for (size_t i = 0; i < myspace.size(); i++)
 				myspace[i] = action::place(i, who);
 			for (size_t i = 0; i < oppospace.size(); i++)
 				oppospace[i] = action::place(i, who);
+			expand(root, true);
+			cout << root->childs[0] << endl;
 		}
 		Node* select(Node* curnode){
-			int bestvalue=0;
+			int bestvalue=-10000;
 			Node* bestnode = NULL;
-			for(int i=0;i<curnode->childs.size();i++){
+			for(int i=0;i<(int)curnode->childs.size();i++){
 				Node* child = curnode->childs[i];
-				double value = uctvalue(*child, curnode->visittime);
-				if(bestvalue < value){
-					bestvalue = value;
+				double val = uctvalue(*child, curnode->visittime);
+				if(bestvalue < val){
+					bestvalue = val;
 					bestnode = child;
 				}
-				}
+			}
 			//TODO: handle leaf node??
 			if(bestnode==NULL) cout << "error: no child to select\n";
 			return bestnode;
@@ -171,7 +145,7 @@ class MCTS{
 		void expand(Node* node, bool myturn){
 			vector <Node*> children;
 			std::vector<action::place> tmpspace = (myturn)? myspace : oppospace;
-			for(int i=0; i<tmpspace.size();i++){
+			for(int i=0; i < (int) tmpspace.size();i++){
 				action::place nextmove = tmpspace[i];
 				board cur = node->position;
 				if(nextmove.apply(cur) == board::legal){
@@ -181,26 +155,32 @@ class MCTS{
 			}
 			node->childs = children;
 		}
-		tuple<action::place, int> rand_action(const board& state, bool myturn){
+		pair<action::place, int> rand_action(board& state, bool myturn){
 
 			std::vector<action::place> tmpspace = (myturn)? myspace : oppospace;
 			std::shuffle(tmpspace.begin(), tmpspace.end(), engine);
 			for (const action::place& move : tmpspace) {
 				board after = state;
-				if (move.apply(after) == board::legal)
-					return {move, 1};
+				if (move.apply(after) == board::legal){
+					return make_pair(move, 1);
+				}
 			}
-			return {tmpspace[0], 0}; //illegal move
+			return make_pair(tmpspace[0], 0); //illegal move
 		}
 		int simulate(const board& state, bool myturn){
 			action::place move;
-			int islegal = 1;
+			
 			int iswin = 0;
-			while(islegal==1){
+			board tmp = state;
+			pair<action::place, int> p = rand_action(tmp,myturn);
+			int islegal = p.second;
+
+			while(p.first.apply(tmp)==board::legal){
 				myturn = !myturn;
-				auto [move, islegal] = rand_action(state, myturn);
+				p = rand_action(tmp, myturn);
 				iswin ++;
-				iswin % 2;
+				iswin = iswin % 2;
+				islegal = p.second;
 			}
 			return iswin;
 			//TODO: should return win or lose
@@ -222,16 +202,20 @@ class MCTS{
 
 		void mcts_simulate(int simulations){
 			for(int i=0;i<simulations;i++){
+				cout << "simulation # " << i << endl;
 				sim(root);
 			}
 		}
 		int sim(Node* node, bool myturn=true){
 			int iswin;
 			if(node->childs.empty()){
+				cout << "empty\n";
 				iswin = simulate(node->position, myturn);
+				cout << "done rollout\n";
 				expand(node, myturn);
+				cout << "done expand\n";
 				update(node,iswin);
-				
+				cout << "done update\n";
 			}
 			else{
 				Node* next = select(node);
@@ -243,12 +227,14 @@ class MCTS{
 		action::place bestaction(){
 			int bestwin = 0;
 			if(root->childs.empty()){
-				auto [move, islegal]  = rand_action(root->position, true);
-				return move;
+				pair<action::place, int> p  = rand_action(root->position, true);
+				if(p.second){
+					return p.first;
+				}
 			}
 			else{
 				Node* bestchild = root->childs[0];
-				for(int i=0; i<root->childs.size(); i++){
+				for(int i=0; i<(int)root->childs.size(); i++){
 					Node* child = root->childs[i];
 					if(child->wintime > bestwin){
 						bestwin = child->wintime;
@@ -256,7 +242,7 @@ class MCTS{
 					}
 				}
 				std::vector<action::place> tmpspace = myspace;
-				for(int i=0;i<tmpspace.size();i++){
+				for(int i=0;i<(int)tmpspace.size();i++){
 					action::place next = tmpspace[i];
 					board nextboard = root->position;
 					if(next.apply(nextboard) == board::legal && nextboard == bestchild->position){
@@ -264,5 +250,42 @@ class MCTS{
 					}
 				}
 			}
+			return action();
 		}
 };
+
+class mctsplayer : public agent {
+	public:
+		mctsplayer(const std::string& args = "") : agent("name=mcts role=unknown " + args),
+			space(board::size_x * board::size_y), who(board::empty) {
+			if (name().find_first_of("[]():; ") != std::string::npos)
+				throw std::invalid_argument("invalid name: " + name());
+			if (role() == "black") who = board::black;
+			if (role() == "white") who = board::white;
+			if (who == board::empty)
+				throw std::invalid_argument("invalid role: " + role());
+			for (size_t i = 0; i < space.size(); i++)
+				space[i] = action::place(i, who);
+		}
+
+		virtual action take_action(const board& state) {
+			cout << "start take action\n";
+			MCTS mcts{who, state};
+			int sim_time=1000;
+			if (meta.find("simulation") != meta.end()){
+				sim_time = int(meta["simulation"]);
+			}
+			mcts.mcts_simulate(sim_time);
+			cout << "done a simulation\n";
+			action::place move = mcts.bestaction();
+			cout << "done a action\n";
+			return move;
+		}
+
+	private:
+		std::vector<action::place> space;
+		board::piece_type who;
+		std::default_random_engine engine;
+	
+};
+
