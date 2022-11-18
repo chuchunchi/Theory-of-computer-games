@@ -18,6 +18,8 @@
 #include "board.h"
 #include "action.h"
 #include <vector>
+#include <chrono>
+#include <ctime> 
 using namespace std;
 class agent {
 public:
@@ -118,14 +120,13 @@ class MCTS{
 		board::piece_type who;
 		std::default_random_engine engine;
 		MCTS(board::piece_type who, const board& b): myspace(board::size_x * board::size_y), oppospace(board::size_x * board::size_y){
+			//cout << "mcts constructor\n";
 			who = who;
 			root = new Node(b);
 			for (size_t i = 0; i < myspace.size(); i++)
 				myspace[i] = action::place(i, who);
 			for (size_t i = 0; i < oppospace.size(); i++)
 				oppospace[i] = action::place(i, who);
-			expand(root, true);
-			cout << root->childs[0] << endl;
 		}
 		Node* select(Node* curnode){
 			int bestvalue=-10000;
@@ -143,6 +144,7 @@ class MCTS{
 			return bestnode;
 		}
 		void expand(Node* node, bool myturn){
+			//cout << "in expand\n";
 			vector <Node*> children;
 			std::vector<action::place> tmpspace = (myturn)? myspace : oppospace;
 			for(int i=0; i < (int) tmpspace.size();i++){
@@ -153,6 +155,7 @@ class MCTS{
 					children.push_back(child);
 				}
 			}
+			shuffle(children.begin(), children.end(), engine);
 			node->childs = children;
 		}
 		pair<action::place, int> rand_action(board& state, bool myturn){
@@ -202,20 +205,16 @@ class MCTS{
 
 		void mcts_simulate(int simulations){
 			for(int i=0;i<simulations;i++){
-				cout << "simulation # " << i << endl;
+				//cout << "simulation # " << i << endl;
 				sim(root);
 			}
 		}
 		int sim(Node* node, bool myturn=true){
 			int iswin;
 			if(node->childs.empty()){
-				cout << "empty\n";
 				iswin = simulate(node->position, myturn);
-				cout << "done rollout\n";
 				expand(node, myturn);
-				cout << "done expand\n";
 				update(node,iswin);
-				cout << "done update\n";
 			}
 			else{
 				Node* next = select(node);
@@ -225,19 +224,20 @@ class MCTS{
 			return iswin;
 		}
 		action::place bestaction(){
-			int bestwin = 0;
+			int best = 0;
 			if(root->childs.empty()){
-				pair<action::place, int> p  = rand_action(root->position, true);
+				return action::place(0,who);
+				/*pair<action::place, int> p  = rand_action(root->position, true);
 				if(p.second){
 					return p.first;
-				}
+				}*/
 			}
 			else{
 				Node* bestchild = root->childs[0];
 				for(int i=0; i<(int)root->childs.size(); i++){
 					Node* child = root->childs[i];
-					if(child->wintime > bestwin){
-						bestwin = child->wintime;
+					if(child->visittime > best){
+						best = child->visittime;
 						bestchild = child;
 					}
 				}
@@ -251,6 +251,12 @@ class MCTS{
 				}
 			}
 			return action();
+		}
+		void del_tree(Node* node){
+			for(int i=0; i<(int)node->childs.size();i++){
+				del_tree(node->childs[i]);
+			}
+			delete node;
 		}
 };
 
@@ -269,16 +275,18 @@ class mctsplayer : public agent {
 		}
 
 		virtual action take_action(const board& state) {
-			cout << "start take action\n";
+			auto start = std::chrono::system_clock::now();
 			MCTS mcts{who, state};
 			int sim_time=1000;
 			if (meta.find("simulation") != meta.end()){
 				sim_time = int(meta["simulation"]);
 			}
 			mcts.mcts_simulate(sim_time);
-			cout << "done a simulation\n";
 			action::place move = mcts.bestaction();
-			cout << "done a action\n";
+			mcts.del_tree(mcts.root);
+			auto end = std::chrono::system_clock::now();
+			std::chrono::duration<double> elapsed_seconds = end-start;
+			cout << "elapsed time: " << elapsed_seconds.count() << endl;
 			return move;
 		}
 
