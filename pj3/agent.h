@@ -105,32 +105,35 @@ private:
 class MCTS{
 	private:
 		struct Node{
-		int visittime;
-		int wintime;
-		vector<Node*> childs;
-		board position;
-		Node(const board& b): visittime(0), wintime(0), position(b){}
-		
-		
-	};
+			int visittime;
+			int wintime;
+			vector<Node*> childs;
+			board position;
+			Node(): visittime(0), wintime(0){}
+			Node(const board& b): visittime(0), wintime(0), position(b){}
+		};
 	public:
 		Node* root;
 		vector<action::place> myspace;
 		vector<action::place> oppospace;
 		board::piece_type who;
 		std::default_random_engine engine;
-		MCTS(board::piece_type who, const board& b): myspace(board::size_x * board::size_y), oppospace(board::size_x * board::size_y){
-			//cout << "mcts constructor\n";
-			who = who;
-			root = new Node(b);
+		MCTS(board::piece_type who): myspace(board::size_x * board::size_y), oppospace(board::size_x * board::size_y){
+			cout << "mcts constructor\n";
+			//who = who;
+			//root = new Node(b);
 			for (size_t i = 0; i < myspace.size(); i++)
 				myspace[i] = action::place(i, who);
 			for (size_t i = 0; i < oppospace.size(); i++)
 				oppospace[i] = action::place(i, who);
 		}
+		void setroot(const board& state){
+			root = new Node(state);
+			expand(root, true);
+		}
 		Node* select(Node* curnode){
 			int bestvalue=-10000;
-			Node* bestnode = NULL;
+			Node* bestnode = new Node();
 			for(int i=0;i<(int)curnode->childs.size();i++){
 				Node* child = curnode->childs[i];
 				double val = uctvalue(*child, curnode->visittime);
@@ -146,16 +149,21 @@ class MCTS{
 		void expand(Node* node, bool myturn){
 			//cout << "in expand\n";
 			vector <Node*> children;
-			std::vector<action::place> tmpspace = (myturn)? myspace : oppospace;
+			std::vector<action::place>& tmpspace = (myturn)? myspace : oppospace;
 			for(int i=0; i < (int) tmpspace.size();i++){
-				action::place nextmove = tmpspace[i];
+				//cout << "inside 155 for loop\n";
+				action::place& nextmove = tmpspace[i];
+				//cout << 157 << endl;
 				board cur = node->position;
+				//cout << 159 << endl;
 				if(nextmove.apply(cur) == board::legal){
+					//cout << "161" << endl;
 					Node* child = new Node(cur);
 					children.push_back(child);
 				}
 			}
 			shuffle(children.begin(), children.end(), engine);
+			//cout << children.size() << endl;
 			node->childs = children;
 		}
 		pair<action::place, int> rand_action(board& state, bool myturn){
@@ -204,16 +212,25 @@ class MCTS{
 		}
 
 		void mcts_simulate(int simulations){
-			for(int i=0;i<simulations;i++){
-				//cout << "simulation # " << i << endl;
+			auto start = std::chrono::system_clock::now();
+			auto end = std::chrono::system_clock::now();
+			std::chrono::duration<double> elapsed_seconds;
+			while(elapsed_seconds.count()<0.999){
+				//cout << "simulation # " << endl;
 				sim(root);
+				end = std::chrono::system_clock::now();
+				elapsed_seconds = end-start;
 			}
+			
+			
+			//cout << "elapsed time: " << elapsed_seconds.count() << endl;
 		}
 		int sim(Node* node, bool myturn=true){
 			int iswin;
 			if(node->childs.empty()){
-				iswin = simulate(node->position, myturn);
 				expand(node, myturn);
+				iswin = simulate(node->position, myturn);
+				
 				update(node,iswin);
 			}
 			else{
@@ -250,12 +267,14 @@ class MCTS{
 					}
 				}
 			}
+			cout << "no available action\n";
 			return action();
 		}
-		void del_tree(Node* node){
-			for(int i=0; i<(int)node->childs.size();i++){
+		void del_tree(Node* node=nullptr) {
+			if (node == nullptr)
+				node = root;
+			for (int i = 0; i < (int)node->childs.size(); i++)
 				del_tree(node->childs[i]);
-			}
 			delete node;
 		}
 };
@@ -272,21 +291,20 @@ class mctsplayer : public agent {
 				throw std::invalid_argument("invalid role: " + role());
 			for (size_t i = 0; i < space.size(); i++)
 				space[i] = action::place(i, who);
+			mcts = new MCTS(who);
 		}
 
 		virtual action take_action(const board& state) {
-			auto start = std::chrono::system_clock::now();
-			MCTS mcts{who, state};
+			//cout << "take action\n";
+			mcts->who = who;
+			mcts->setroot(state);
 			int sim_time=1000;
 			if (meta.find("simulation") != meta.end()){
 				sim_time = int(meta["simulation"]);
 			}
-			mcts.mcts_simulate(sim_time);
-			action::place move = mcts.bestaction();
-			mcts.del_tree(mcts.root);
-			auto end = std::chrono::system_clock::now();
-			std::chrono::duration<double> elapsed_seconds = end-start;
-			cout << "elapsed time: " << elapsed_seconds.count() << endl;
+			mcts->mcts_simulate(sim_time);
+			action::place move = mcts->bestaction();
+			mcts->del_tree(mcts->root);
 			return move;
 		}
 
@@ -294,6 +312,7 @@ class mctsplayer : public agent {
 		std::vector<action::place> space;
 		board::piece_type who;
 		std::default_random_engine engine;
+		MCTS* mcts;
 	
 };
 
