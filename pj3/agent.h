@@ -114,18 +114,18 @@ class MCTS{
 		};
 	public:
 		Node* root;
-		vector<action::place> myspace;
-		vector<action::place> oppospace;
+		vector<action::place> blackspace;
+		vector<action::place> whitespace;
 		board::piece_type who;
 		std::default_random_engine engine;
-		MCTS(board::piece_type who): myspace(board::size_x * board::size_y), oppospace(board::size_x * board::size_y){
+		MCTS(board::piece_type who): blackspace(board::size_x * board::size_y), whitespace(board::size_x * board::size_y){
 			cout << "mcts constructor\n";
 			//who = who;
 			//root = new Node(b);
-			for (size_t i = 0; i < myspace.size(); i++)
-				myspace[i] = action::place(i, who);
-			for (size_t i = 0; i < oppospace.size(); i++)
-				oppospace[i] = action::place(i, who);
+			for (size_t i = 0; i < blackspace.size(); i++)
+				blackspace[i] = action::place(i, who);
+			for (size_t i = 0; i < whitespace.size(); i++)
+				whitespace[i] = action::place(i, who);
 		}
 		void setroot(const board& state){
 			root = new Node(state);
@@ -151,11 +151,16 @@ class MCTS{
 			//return bestnode;
 			return curnode->childs[bestchild];
 		}
+		bool isblack(bool myturn){
+			if((myturn && who==board::black)||(!myturn && who==board::white)){
+				return 1;
+			}
+			else return 0;
+		}
 		void expand(Node* node, bool myturn){
 			//cout << "in expand\n";
-			//vector <Node*> children;
-			
-			std::vector<action::place>& tmpspace = (myturn)? myspace : oppospace;
+			vector <Node*> children;
+			std::vector<action::place>& tmpspace = isblack(myturn)? blackspace : whitespace;
 			for(int i=0; i < (int) tmpspace.size();i++){
 				//cout << "inside 155 for loop\n";
 				action::place& nextmove = tmpspace[i];
@@ -165,19 +170,18 @@ class MCTS{
 				if(nextmove.apply(cur) == board::legal){
 					//cout << "161" << endl;
 					Node* child = new Node(cur);
-					node->childs.push_back(child);
+					children.push_back(child);
 				}
 			}
-			//shuffle(children.begin(), children.end(), engine);
-			//cout << children.size() << endl;
-			//node->childs = children;
-			//children.clear();
-			//children.shrink_to_fit();
+			shuffle(children.begin(), children.end(), engine);
+			node->childs = children;
+			children.clear();
+			children.shrink_to_fit();
 
 		}
 		action::place rand_action(board& state, bool myturn){
 
-			std::vector<action::place> tmpspace = (myturn)? myspace : oppospace;
+			std::vector<action::place> tmpspace = isblack(myturn)? blackspace : whitespace;
 			std::shuffle(tmpspace.begin(), tmpspace.end(), engine);
 			for (const action::place& move : tmpspace) {
 				board after = state;
@@ -202,6 +206,7 @@ class MCTS{
 				p = rand_action(tmp, myturn);
 				iswin ++;
 				iswin = iswin % 2;
+				cout << myturn << " " << iswin << endl;
 			}
 			return iswin;
 			//TODO: should return win or lose
@@ -232,7 +237,7 @@ class MCTS{
 			
 			//cout << "elapsed time: " << elapsed_seconds.count() << endl;
 		}
-		int sim(Node* node, bool myturn=false){
+		int sim(Node* node, bool myturn=true){
 			int iswin;
 			if(node->childs.empty()){
 				iswin = simulate(node->position, myturn);
@@ -265,11 +270,12 @@ class MCTS{
 						bestchild = child;
 					}
 				}
-				std::vector<action::place> tmpspace = myspace;
+				std::vector<action::place>& tmpspace = (who==board::black)? blackspace:whitespace;
 				for(int i=0;i<(int)tmpspace.size();i++){
 					action::place next = tmpspace[i];
-					board nextboard = root->position;
-					if(next.apply(nextboard) == board::legal && nextboard == bestchild->position){
+					board& nextboard = bestchild->position;
+					board curposition = root->position;
+					if(next.apply(curposition) == board::legal && nextboard == curposition){
 						return next;
 					}
 				}

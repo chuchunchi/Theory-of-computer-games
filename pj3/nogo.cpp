@@ -69,8 +69,8 @@ int main(int argc, const char* argv[]) {
 		if (stats.is_finished()) stats.summary();
 	}
 
-	player black("name=black " + black_args + " role=black");
-	player white("name=white " + white_args + " role=white");
+	mctsplayer black("name=black " + black_args + " role=black");
+	mctsplayer white("name=white " + white_args + " role=white");
 
 	if (!shell) { // launch standard local games
 		while (!stats.is_finished()) {
