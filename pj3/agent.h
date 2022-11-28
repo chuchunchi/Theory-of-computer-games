@@ -97,26 +97,35 @@ class Mcts {
 
 		
 
-		void mcts_simulate(int simulations){
+		void mcts_simulate(){
 			clock_t start;
 			start = clock();
-			while((float) (clock()-start)/CLOCKS_PER_SEC<0.99){
+			sims_count++;
+			float clocktime;
+			if(sims_count<=3) clocktime = 0.8;
+			else if(sims_count<=8) clocktime = 1;
+			else if(sims_count<=15) clocktime = 1.2;
+			else if(sims_count<=20) clocktime = 1.5;
+			else if(sims_count<=25) clocktime = 1.2;
+			else clocktime = 1;
+			while((float) (clock()-start)/CLOCKS_PER_SEC<clocktime){
 				//cout << "simulation # " << endl;
 				sim(root);
 			}
-				
+			
 			//cout << "elapsed time: " << elapsed_seconds.count() << endl;
 		}
 
 		action::place bestaction(){
 			int best = 0;
 			if(root->childs.empty()){
-				cout << 250 << endl;
-				return action::place(0,who);
-				/*pair<action::place, int> p  = rand_action(root->position, true);
-				if(p.second){
-					return p.first;
-				}*/
+				//cout << "weird" << endl;
+				//return action();
+				action::place p  = rand_action(root->position, true);
+				board tmp = root->position;
+				if(p.apply(tmp)==board::legal){
+					return p;
+				}
 			}
 			else{
 				Node* bestchild = root->childs[0];
@@ -166,9 +175,6 @@ class Mcts {
 				}
 				
 			}
-			//TODO: handle leaf node??
-			//if(bestnode==NULL) cout << "error: no child to select\n";
-			//return bestnode;
 			return curnode->childs[bestchild];
 		}
 		bool isblack(bool myturn){
@@ -216,7 +222,7 @@ class Mcts {
 					p = rand_action(tmp, myturn);
 					iswin ++;
 					iswin = iswin % 2;
-					cout << myturn << " " << iswin << endl;
+					//cout << myturn << " " << iswin << endl;
 				}
 				return !myturn;
 				//TODO: should return win or lose
@@ -257,6 +263,7 @@ class Mcts {
 		}
 
 	private:
+		int sims_count = 0;
 		Node* root;
 		std::vector<action::place> blackspace;
 		std::vector<action::place> whitespace;
@@ -301,7 +308,7 @@ public:
 
 	action mctsAction(const board& state) {
 	    mcts.setRoot(state);
-	    mcts.mcts_simulate(int(meta["simulation"]));
+	    mcts.mcts_simulate();
 	    action::place move = mcts.bestaction();
 	    mcts.del_tree();
 	    return move;
