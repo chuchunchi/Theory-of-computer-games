@@ -80,6 +80,8 @@ public:
 			load_weights(meta["load"]);
 		if (meta.find("alpha") != meta.end())
 			alpha = float(meta["alpha"]); 
+		if (meta.find("seed") != meta.end())
+			engine.seed(int(meta["seed"]));
 	}
 	virtual ~weight_agent() {
 		if (meta.find("save") != meta.end()){
@@ -117,6 +119,7 @@ protected:
 	std::vector<weight> net;
 	float alpha;
 	int trained;
+	std::default_random_engine engine;
 };
 
 /**
@@ -233,6 +236,10 @@ int tup[4][6] = { {0, 1, 2, 3, 4, 5},
                     {4, 5, 6, 7, 8, 9},
                     {5, 6, 7, 9, 10, 11},
                     {9, 10, 11, 13, 14, 15}};
+int margin[4][4] = { {12, 13, 14, 15},
+						{0, 4, 8, 12},
+						{0, 1, 2, 3},
+						{3, 7, 11, 15} };
 
 class weight_slider : public weight_agent {
 public:
@@ -244,8 +251,9 @@ public:
 		double bestval=-10000000;
 		int bestop=-1;
 		if(!trained) prev=before; // if the first step
-		for(int op=0;op<4;op++){
+		/*for(int op=0;op<4;op++){
 			board board1 = before;
+			//cout << board1.hint() << endl;
 			board::reward reward1 =board1.slide(op);
 			// choose the best operation base on current weight table.
 			if(reward1 != -1){
@@ -255,7 +263,8 @@ public:
 					bestop=op;
 				}
 			}
-		}
+		}*/
+		bestop = expectimax(before);
 		next = before;
 		board::reward nextreward = next.slide(bestop);
 		if(trained) TDlearn(nextreward); // if not the first step
@@ -269,7 +278,59 @@ public:
 		}
 		
 	}	
-
+	int expectimax(const board& before){
+		int final_bestop = -1;
+		double final_bestval = -100000000;
+		for(int op=0;op<4;op++){
+			board board1 = before;
+			board::reward reward1 = board1.slide(op);
+			int poscount=4;
+			double valcount=0;
+			for(int i=0;i<4;i++){
+				board board2 = board1;
+				int p = margin[op][i];
+				/*if (board2(p) != 0){
+					poscount--;
+					continue;
+				}*/
+				//generate random hint
+				int bag[3], num = 0;
+				for (board::cell t = 1; t <= 3; t++)
+					for (size_t it = 0; it < board2.bag(t); it++)
+						bag[num++] = t;
+				std::shuffle(bag, bag + num, engine);
+				board::cell hint = bag[--num];
+				int val = board2.place(p, board2.hint(), hint);
+				if(val<0){
+					poscount--;
+					continue;
+				}
+				double bestval=-10000000;
+				for(int op2=0;op2<4;op2++){
+					board board3 = board2;
+					board::reward reward2 = board3.slide(op2);
+					// choose the best operation base on current weight table.
+					if(reward2 != -1){
+						double value = get_value(board3);
+						if(reward2+value>bestval){
+							bestval = reward2+value;
+						}
+					}
+				}
+				if (bestval > -10000000) valcount += bestval;
+				else poscount--;
+			}
+			double opvalue=reward1;
+			if(poscount!=0){
+				opvalue += valcount / poscount;
+			}
+			if(opvalue > final_bestval){
+				final_bestval = opvalue;
+				final_bestop = op;
+			}
+		}
+		return final_bestop;
+	}
 	double get_value(board& b){
 		double value=0;
 		//for 8*4 tuple
