@@ -19,6 +19,7 @@
 #include "action.h"
 #include "weight.h"
 #include <vector>
+#include <algorithm>
 using namespace std;
 class agent {
 public:
@@ -248,10 +249,12 @@ public:
         trained = 0;
     }
 	virtual action take_action(const board& before) {
-		double bestval=-10000000;
+		
 		int bestop=-1;
 		if(!trained) prev=before; // if the first step
-		/*for(int op=0;op<4;op++){
+		/*
+		double bestval=-10000000;
+		for(int op=0;op<4;op++){
 			board board1 = before;
 			//cout << board1.hint() << endl;
 			board::reward reward1 =board1.slide(op);
@@ -265,10 +268,11 @@ public:
 			}
 		}*/
 		bestop = expectimax(before);
+		//bestop = SelectBestOp(before);
 		next = before;
 		board::reward nextreward = next.slide(bestop);
-		if(trained) TDlearn(nextreward); // if not the first step
-		trained = 1;
+		if(trained>=2) TDlearn(nextreward); // if not the first step
+		trained += 1;
 		if(bestop!=-1){
 			prev = next;
 			return action::slide(bestop);
@@ -280,19 +284,16 @@ public:
 	}	
 	int expectimax(const board& before){
 		int final_bestop = -1;
-		double final_bestval = -100000000;
+		double final_bestval = -1e15;
 		for(int op=0;op<4;op++){
-			board board1 = before;
+			board board1 = board(before);
 			board::reward reward1 = board1.slide(op);
+			
 			int poscount=4;
 			double valcount=0;
 			for(int i=0;i<4;i++){
-				board board2 = board1;
+				board board2 = board(board1);
 				int p = margin[op][i];
-				/*if (board2(p) != 0){
-					poscount--;
-					continue;
-				}*/
 				//generate random hint
 				int bag[3], num = 0;
 				for (board::cell t = 1; t <= 3; t++)
@@ -307,7 +308,7 @@ public:
 				}
 				double bestval=-10000000;
 				for(int op2=0;op2<4;op2++){
-					board board3 = board2;
+					board board3 = board(board2);
 					board::reward reward2 = board3.slide(op2);
 					// choose the best operation base on current weight table.
 					if(reward2 != -1){
@@ -318,19 +319,26 @@ public:
 					}
 				}
 				if (bestval > -10000000) valcount += bestval;
-				else poscount--;
+				//else poscount--;
 			}
-			double opvalue=reward1;
+			
+			double opvalue=0;
 			if(poscount!=0){
-				opvalue += valcount / poscount;
+				opvalue = reward1 + get_value(board1) + valcount / poscount;
+				//cout << opvalue << endl;
 			}
-			if(opvalue > final_bestval){
-				final_bestval = opvalue;
-				final_bestop = op;
+			//double opvalue = reward1 + get_value(board1) + Expectimax(board1, op, 1);
+			if(reward1 != -1){
+
+				if(opvalue > final_bestval){
+					final_bestval = opvalue;
+					final_bestop = op;
+				}
 			}
 		}
 		return final_bestop;
 	}
+	
 	double get_value(board& b){
 		double value=0;
 		//for 8*4 tuple
