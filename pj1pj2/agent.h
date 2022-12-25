@@ -74,13 +74,15 @@ protected:
  */
 class weight_agent : public agent {
 public:
-	weight_agent(const std::string& args = "") : agent(args), alpha(0.1/32), trained(0) {
+	weight_agent(const std::string& args = "") : agent(args), alpha(0.1/32), lambda(0), trained(0) {
 		if (meta.find("init") != meta.end())
 			init_weights(meta["init"]);
 		if (meta.find("load") != meta.end())
 			load_weights(meta["load"]);
 		if (meta.find("alpha") != meta.end())
 			alpha = float(meta["alpha"]); 
+		if (meta.find("lambda") != meta.end())
+			lambda = float(meta["lambda"]); 
 		if (meta.find("seed") != meta.end())
 			engine.seed(int(meta["seed"]));
 	}
@@ -119,6 +121,7 @@ protected:
 protected:
 	std::vector<weight> net;
 	float alpha;
+	float lambda;
 	int trained;
 	std::default_random_engine engine;
 };
@@ -268,13 +271,13 @@ public:
 			}
 		}*/
 		bestop = expectimax(before);
-		//bestop = SelectBestOp(before);
-		next = before;
-		board::reward nextreward = next.slide(bestop);
-		if(trained>=2) TDlearn(nextreward); // if not the first step
-		trained += 1;
+		//next = before;
+		//board::reward nextreward = next.slide(bestop);
+		//if(trained>=2) TDlearn(nextreward); // if not the first step
+		//trained += 1;
 		if(bestop!=-1){
 			prev = next;
+			//next = nextnext;
 			return action::slide(bestop);
 		}
 		else{ // bestop==-1 -> no available move
@@ -285,6 +288,7 @@ public:
 	int expectimax(const board& before){
 		int final_bestop = -1;
 		double final_bestval = -1e15;
+		int bestop2[4] = {-1,-1,-1,-1};
 		for(int op=0;op<4;op++){
 			board board1 = board(before);
 			board::reward reward1 = board1.slide(op);
@@ -315,6 +319,7 @@ public:
 						double value = get_value(board3);
 						if(reward2+value>bestval){
 							bestval = reward2+value;
+							bestop2[op] = op2;
 						}
 					}
 				}
@@ -324,7 +329,7 @@ public:
 			
 			double opvalue=0;
 			if(poscount!=0){
-				opvalue = reward1 + get_value(board1) + valcount / poscount;
+				opvalue = reward1 + valcount / poscount;
 				//cout << opvalue << endl;
 			}
 			//double opvalue = reward1 + get_value(board1) + Expectimax(board1, op, 1);
@@ -336,6 +341,12 @@ public:
 				}
 			}
 		}
+		next = before;
+		board::reward nextreward = next.slide(final_bestop);
+		nextnext = next;
+		board::reward nextreward2 = nextnext.slide(bestop2[final_bestop]);
+		if(trained>=2) TDlearn(nextreward,nextreward2); // if not the first step
+		trained += 1;
 		return final_bestop;
 	}
 	
@@ -360,11 +371,24 @@ public:
 		return value;
 	}
 
-	void TDlearn(double reward){
+	void TDlearn(double reward, double reward2){
 		double TDerr;
-		if(reward==-1) TDerr = alpha*(-get_value(prev));
-		else TDerr = alpha*(reward+get_value(next)-get_value(prev));
+		if(reward==-1) TDerr = -get_value(prev);
+		else{
+			TDerr = reward+get_value(next)-get_value(prev);
+			//Add 2 step TD
+			if(lambda!=0){
+				if(reward2!=-1){
+					TDerr = (1-lambda)*TDerr + lambda * (1-lambda) * ( reward + reward2 + get_value(nextnext) - get_value(next) );
+				}
+				else{
+					TDerr = (1-lambda)*TDerr + lambda * (1-lambda) * ( reward + reward2 - get_value(next) );
+				}
+			}
+		} 
 		
+		TDerr *= alpha;
+
 		/* for 8*4-tuple
 		for(int i=0;i<n;i++){
 			net[i][b2feature(prev,i)] += TDerr;
@@ -395,4 +419,5 @@ public:
 private:
 	board next;
 	board prev;
+	board nextnext;
 };	
