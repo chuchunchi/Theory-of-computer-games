@@ -271,13 +271,9 @@ public:
 			}
 		}*/
 		bestop = expectimax(before);
-		//next = before;
-		//board::reward nextreward = next.slide(bestop);
-		//if(trained>=2) TDlearn(nextreward); // if not the first step
-		//trained += 1;
+		
 		if(bestop!=-1){
 			prev = next;
-			//next = nextnext;
 			return action::slide(bestop);
 		}
 		else{ // bestop==-1 -> no available move
@@ -329,7 +325,7 @@ public:
 			
 			double opvalue=0;
 			if(poscount!=0){
-				opvalue = reward1 + valcount / poscount;
+				opvalue = reward1 + get_value(board1) + valcount / poscount;
 				//cout << opvalue << endl;
 			}
 			//double opvalue = reward1 + get_value(board1) + Expectimax(board1, op, 1);
@@ -343,10 +339,14 @@ public:
 		}
 		next = before;
 		board::reward nextreward = next.slide(final_bestop);
-		nextnext = next;
-		board::reward nextreward2 = nextnext.slide(bestop2[final_bestop]);
-		if(trained>=2) TDlearn(nextreward,nextreward2); // if not the first step
+		if(trained>=2) TDlearn(nextreward); // if not the first step
 		trained += 1;
+		if(lambda!=0){
+			nextnext = next;
+			board::reward nextreward2 = nextnext.slide(bestop2[final_bestop]);
+			if(trained>=2) TD2step(nextreward,nextreward2); // if not the first step
+			trained += 1;
+		}
 		return final_bestop;
 	}
 	
@@ -371,19 +371,37 @@ public:
 		return value;
 	}
 
-	void TDlearn(double reward, double reward2){
+	void TDlearn(double reward){
+		double TDerr;
+		if(reward==-1) TDerr = alpha*(-get_value(prev));
+		else TDerr = alpha*(reward+get_value(next)-get_value(prev));
+		
+		/* for 8*4-tuple
+		for(int i=0;i<n;i++){
+			net[i][b2feature(prev,i)] += TDerr;
+		}*/
+		// for 4*6-tuple
+		for(int i=0;i<2;i++){
+			for(int j=0;j<4;j++){
+				for(int f=0;f<n;f++){
+					net[f][b2feature(prev,f)] += TDerr;
+				}
+				prev.rotate_clockwise();
+			}
+			prev.reflect_vertical();
+		}
+	}
+	void TD2step(double reward, double reward2){
 		double TDerr;
 		if(reward==-1) TDerr = -get_value(prev);
 		else{
 			TDerr = reward+get_value(next)-get_value(prev);
 			//Add 2 step TD
-			if(lambda!=0){
-				if(reward2!=-1){
-					TDerr = (1-lambda)*TDerr + lambda * (1-lambda) * ( reward + reward2 + get_value(nextnext) - get_value(next) );
-				}
-				else{
-					TDerr = (1-lambda)*TDerr + lambda * (1-lambda) * ( reward + reward2 - get_value(next) );
-				}
+			if(reward2!=-1){
+				TDerr = (1-lambda)*TDerr + lambda * (1-lambda) * ( reward + reward2 + get_value(nextnext) - get_value(next) );
+			}
+			else{
+				TDerr = (1-lambda)*TDerr + lambda * (1-lambda) * ( reward + reward2 - get_value(next) );
 			}
 		} 
 		
@@ -404,7 +422,6 @@ public:
 			prev.reflect_vertical();
 		}
 	}
-
 	long long int  b2feature(board& b,int f){//board to feature
 		long long int ret=0;
 		int weight[6] = {1,15,225,3375,50625,759375};
