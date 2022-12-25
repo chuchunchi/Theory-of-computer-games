@@ -325,7 +325,7 @@ public:
 			
 			double opvalue=0;
 			if(poscount!=0){
-				opvalue = reward1 + get_value(board1) + valcount / poscount;
+				opvalue = reward1 + valcount / poscount;
 				//cout << opvalue << endl;
 			}
 			//double opvalue = reward1 + get_value(board1) + Expectimax(board1, op, 1);
