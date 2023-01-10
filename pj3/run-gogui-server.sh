@@ -1,7 +1,7 @@
 #!/bin/bash
 echo "GoGui-Server Launcher V20211112"
 # command to launch
-player='./nogo --shell --name="Hollow" --black="mcts T=1000" --white="mcts T=1000"'
+player='./nogo --shell --name="ruby" --black="type=mcts" --white="type=mcts"'
 # port for binding
 port=${1:-auto}
 # display mode: states or commands
